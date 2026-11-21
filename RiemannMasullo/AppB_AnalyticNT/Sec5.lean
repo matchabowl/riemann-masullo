@@ -119,7 +119,14 @@ def TorusRiemannIntegrable {X : Type*} [TopologicalSpace X] [MeasurableSpace X]
 /-- The indicator of the identity on the unit circle is Riemann integrable. -/
 theorem torusRiemannIntegrable_indicator_zero :
     TorusRiemannIntegrable (volume : Measure UnitAddCircle)
-      (({0} : Set UnitAddCircle).indicator (fun _ ↦ (1 : ℂ))) := by sorry
+      (({0} : Set UnitAddCircle).indicator (fun _ ↦ (1 : ℂ))) := by
+  refine ⟨⟨1, fun x ↦ ?_⟩, ?_⟩
+  · by_cases hx : x ∈ ({0} : Set UnitAddCircle) <;> simp [hx]
+  · have h0 : (volume : Measure UnitAddCircle) {0} = 0 := measure_singleton 0
+    filter_upwards [measure_eq_zero_iff_ae_notMem.mp h0] with x hx
+    refine continuousAt_const.congr (f := fun _ ↦ (0 : ℂ)) ?_
+    filter_upwards [isOpen_compl_singleton.mem_nhds hx] with y hy
+    exact (indicator_of_notMem hy _).symm
 
 /-- Paper: Theorem B.5.2.1(1), p. 627.
 The closed orbit subgroup is topologically isomorphic to the torus of dimension the rational
