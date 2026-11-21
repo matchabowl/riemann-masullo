@@ -525,7 +525,23 @@ def schwartzBruhatDifferenceProduct (S : List G) : SchwartzBruhat G →L[ℂ] Sc
 Schwartz–Bruhat difference product is the second finite difference. -/
 theorem schwartzBruhatDifferenceProduct_pair_apply (f : SchwartzBruhat G) (x : G) :
     schwartzBruhatDifferenceProduct [γ, γ] f x =
-      f x - 2 * f (γ * x) + f (γ ^ 2 * x) := by sorry
+      f x - 2 * f (γ * x) + f (γ ^ 2 * x) := by
+  -- `schwartzBruhatCyclicDifference_apply` was stated with a Borel structure in scope; its
+  -- conclusion does not depend on it, so any Borel structure will do.
+  let _ : MeasurableSpace G := borel G
+  have _ : BorelSpace G := ⟨rfl⟩
+  have h : schwartzBruhatDifferenceProduct [γ, γ] f =
+      schwartzBruhatCyclicDifference γ (schwartzBruhatCyclicDifference γ f) := by
+    simp only [schwartzBruhatDifferenceProduct, List.map_cons, List.map_nil, List.prod_cons,
+      List.prod_nil, mul_one, mul_apply_eq_comp]
+  have h0 := congrArg (fun g : SchwartzBruhat G ↦ g x) h
+  have h1 := schwartzBruhatCyclicDifference_apply γ (schwartzBruhatCyclicDifference γ f) x
+  have h2 := schwartzBruhatCyclicDifference_apply γ f x
+  have h3 := schwartzBruhatCyclicDifference_apply γ f (γ * x)
+  have h4 : f (γ ^ 2 * x) = f (γ * (γ * x)) := congrArg f (by rw [sq, mul_assoc])
+  -- No `rw` on the main goal: its closing `rfl` check, like rewriting with `h2`, makes Lean
+  -- unfold the translation action defining the cyclic difference, which times out.
+  linear_combination h0 + h1 + h2 - h3 - h4
 
 /-- Paper: Corollary 4.6.3.1, pp. 219–220. The ordinary Schwartz–Bruhat
 difference product preserves the norm-one isotype. -/
