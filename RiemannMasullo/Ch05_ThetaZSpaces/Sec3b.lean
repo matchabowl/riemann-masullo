@@ -6,6 +6,7 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import Mathlib.Analysis.Calculus.InverseFunctionTheorem.ContDiff
 import Mathlib.Analysis.SpecialFunctions.Exponential
 import Mathlib.Topology.Algebra.IsOpenUnits
+import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 
 /-! # Extensions by zero and holomorphic S-idelic zeta functions
 
@@ -117,17 +118,66 @@ theorem complexCoordinate_mul_exponentialDecay (conjugate : Bool) (a : ℝ) :
     ∃ M : 𝓔(ℂ, 2, Ici a) →L[ℂ] 𝓔(ℂ, 2, Ici a),
       ∀ f z, (M f).val z = complexCoordinate(conjugate) z.val * f.val z := by sorry
 
+/-- The real absolute value on the units is a surjective modulation. -/
+private theorem realCoordinate_mul_allExponentialDecay_modulation
+    [SecondCountableTopology ℝˣ] :
+    IsModulation (archimedeanUnitModulation ℝ 1) ∧ Surjective (archimedeanUnitModulation ℝ 1) := by
+  refine ⟨⟨isProperMap_units_nnNorm_pow (K := ℝ) 1 one_ne_zero, ⟨Units.mk0 2 two_ne_zero, ?_⟩⟩, ?_⟩
+  · intro h
+    have h2 := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) h
+    simp only [archimedeanUnitModulation_apply, Units.val_mk0, pow_one, Units.val_one,
+      NNReal.coe_one] at h2
+    norm_num at h2
+  · intro t
+    have ht : ((t.val : ℝ≥0) : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr t.ne_zero
+    refine ⟨Units.mk0 _ ht, Units.ext (NNReal.eq ?_)⟩
+    rw [archimedeanUnitModulation_apply, Units.val_mk0, pow_one, Real.norm_eq_abs,
+      abs_of_nonneg (NNReal.coe_nonneg _)]
+
 /-- Paper: Proposition 5.3.3.2(1), p. 249.
 Multiplication by the real coordinate is continuously invertible for decay at all exponents. -/
 theorem realCoordinate_mul_allExponentialDecay :
     ∃ M : 𝓔(ℝ, 1, univ) ≃L[ℂ] 𝓔(ℝ, 1, univ),
-      ∀ f x, (M f).val x = ((x : ℝ) : ℂ) * f.val x := by sorry
+      ∀ f x, (M f).val x = ((x : ℝ) : ℂ) * f.val x := by
+  letI : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hm := realCoordinate_mul_allExponentialDecay_modulation.1
+  have hms := realCoordinate_mul_allExponentialDecay_modulation.2
+  let c : QuasiCharacter ℝˣ :=
+    ⟨Complex.ofRealHom.toMonoidHom.comp (Units.coeHom ℝ),
+      Complex.continuous_ofReal.comp Units.continuous_val⟩
+  exact modulatedExponentialDecay_mul_quasiCharacter _ hm hms c
+
+/-- The squared complex absolute value on the units is a surjective modulation. -/
+private theorem complexCoordinate_mul_allExponentialDecay_modulation
+    [SecondCountableTopology ℂˣ] :
+    IsModulation (archimedeanUnitModulation ℂ 2) ∧ Surjective (archimedeanUnitModulation ℂ 2) := by
+  refine ⟨⟨isProperMap_units_nnNorm_pow (K := ℂ) 2 two_ne_zero, ⟨Units.mk0 2 two_ne_zero, ?_⟩⟩, ?_⟩
+  · intro h
+    have h2 := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) h
+    simp only [archimedeanUnitModulation_apply, Units.val_mk0, Units.val_one,
+      NNReal.coe_one, Complex.norm_ofNat] at h2
+    norm_num at h2
+  · intro t
+    have ht : ((Real.sqrt ((t.val : ℝ≥0) : ℝ) : ℝ) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (Real.sqrt_ne_zero'.mpr (NNReal.coe_pos.mpr (Units.zero_lt t)))
+    refine ⟨Units.mk0 _ ht, Units.ext (NNReal.eq ?_)⟩
+    rw [archimedeanUnitModulation_apply, Units.val_mk0, Complex.norm_real, Real.norm_eq_abs,
+      sq_abs, Real.sq_sqrt (NNReal.coe_nonneg _)]
 
 /-- Paper: Proposition 5.3.3.2(1), p. 249.
 Multiplication by z or its conjugate is continuously invertible for decay at all exponents. -/
 theorem complexCoordinate_mul_allExponentialDecay (conjugate : Bool) :
     ∃ M : 𝓔(ℂ, 2, univ) ≃L[ℂ] 𝓔(ℂ, 2, univ),
-      ∀ f z, (M f).val z = complexCoordinate(conjugate) z.val * f.val z := by sorry
+      ∀ f z, (M f).val z = complexCoordinate(conjugate) z.val * f.val z := by
+  letI : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hm := complexCoordinate_mul_allExponentialDecay_modulation.1
+  have hms := complexCoordinate_mul_allExponentialDecay_modulation.2
+  cases conjugate
+  · exact modulatedExponentialDecay_mul_quasiCharacter _ hm hms
+      ⟨Units.coeHom ℂ, Units.continuous_val⟩
+  · exact modulatedExponentialDecay_mul_quasiCharacter _ hm hms
+      ⟨(starRingEnd ℂ).toMonoidHom.comp (Units.coeHom ℂ),
+        Complex.continuous_conj.comp Units.continuous_val⟩
 
 -- TODO(paper-gap): Footnote 8 flags the closed-range argument. A convergent net in the LF
 -- space of tests need not eventually be bounded and a directed set need not have countable cofinality.
@@ -173,11 +223,6 @@ exponents and act continuously there. -/
 theorem iteratedWirtinger_allExponentialDecay (conjugate : Bool) (m : ℕ) :
     ∃ D : 𝓔(ℂ, 2, univ) →L[ℂ] 𝓔(ℂ, 2, univ),
       ∀ f z, (D f).val z = ((wirtinger(conjugate))^[m] zeroExtension(f.val)) z.val := by sorry
-
-/-- Paper: Proposition 5.3.3.2(2)(1), p. 250.
-Weighted Schwartz–Bruhat functions are smooth on the punctured real line. -/
-theorem realExponentialDecay_contDiffOn (f : 𝓔(ℝ, 1, Ioi 0)) :
-    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set ℝ) := by sorry
 
 /-- In exponential coordinates, the realization of a Schwartz–Bruhat stage is
 smooth along every translate of a continuous homomorphism from a real vector space. -/
@@ -295,6 +340,16 @@ private theorem complexExponentialDecay_contDiffOn_of_weight {K : Type*} [Normed
     (modulatedExponentialDecayTwist_apply m _ _ f u).trans (by rw [← hwu]; rfl)
   change f.val u = g.val u * (w x)⁻¹
   rw [hg, mul_right_comm, mul_inv_cancel₀ (hn x hx0), one_mul]
+
+/-- Paper: Proposition 5.3.3.2(2)(1), p. 250.
+Weighted Schwartz–Bruhat functions are smooth on the punctured real line. -/
+theorem realExponentialDecay_contDiffOn (f : 𝓔(ℝ, 1, Ioi 0)) :
+    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set ℝ) := by
+  apply complexExponentialDecay_contDiffOn_of_weight (archimedeanUnitModulation ℝ 1) 2
+    (by norm_num : (2 : ℝ) ∈ Ioi 0) f (fun x ↦ ((x ^ 2 : ℝ) : ℂ))
+    (Complex.ofRealCLM.contDiff.comp (contDiff_id.pow 2))
+  intro u
+  rw [archimedeanUnitModulation_apply, pow_one, Real.norm_eq_abs, Real.rpow_two, sq_abs]
 
 /-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
 Weighted Schwartz–Bruhat functions are smooth on the punctured complex plane
