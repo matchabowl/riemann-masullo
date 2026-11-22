@@ -425,11 +425,37 @@ def modulatedCompactSupportSubmodule : Submodule ℂ E :=
     ⨅ x : {x : G // m x ∉ B}, LinearMap.ker
       ((LinearMap.proj x.val).comp (modulatedExponentialDecaySubmodule m Set.univ).subtype)
 
+/-- An abstract form of `mem_modulatedCompactSupportSubmodule_iff`: in a function space with
+generating seminorms, membership in a submodule `Tf` that cuts out compact support, intersected
+with the kernels of evaluation off a closed set `Z`, means compact support with topological
+support in `Z`. Stated abstractly so that elaboration does not unfold the decay space. -/
+private theorem mem_comap_inf_iInf_ker_proj_iff {X : Type*} [TopologicalSpace X]
+    (Sf Tf : Submodule ℂ (X → ℂ)) {ι : Type*} (p : SeminormFamily ℂ Sf ι) (Z : Set X)
+    (hZ : IsClosed Z) (hT : ∀ g : Sf, g.val ∈ Tf ↔ HasCompactSupport g.val)
+    (f : WithGeneratingSeminorms Sf p) :
+    f ∈ (Tf.comap (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ)) ⊓
+        ⨅ x : {x : X // x ∉ Z}, LinearMap.ker
+          ((LinearMap.proj x.val).comp (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ))) :
+        Submodule ℂ (WithGeneratingSeminorms Sf p)) ↔
+      HasCompactSupport (f : Sf).val ∧ tsupport (f : Sf).val ⊆ Z := by
+  refine Submodule.mem_inf.trans (and_congr (hT f) (Submodule.mem_iInf _ |>.trans
+    ⟨fun h ↦ closure_minimal (fun x hx ↦ ?_) hZ, fun h x ↦ ?_⟩))
+  · by_contra hxZ
+    exact hx (LinearMap.mem_ker.mp (h ⟨x, hxZ⟩))
+  · exact LinearMap.mem_ker.mpr
+      (image_eq_zero_of_notMem_tsupport (f := (f : Sf).val) (x := x.val) fun hx ↦ x.2 (h hx))
+
+-- The section-variable linter scans the large elaborated decay types and takes minutes.
+set_option linter.unusedSectionVars false in
 /-- Paper: §4.5.2, p. 205. For a closed module window, membership in the
 fixed-support space is equivalent to the stated condition on topological support. -/
 theorem mem_modulatedCompactSupportSubmodule_iff (hB : IsClosed B) (f : E) :
     f ∈ modulatedCompactSupportSubmodule m B ↔
-      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B := by sorry
+      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B :=
+  mem_comap_inf_iInf_ker_proj_iff (modulatedExponentialDecaySubmodule m Set.univ)
+    (bruhatCompactSupportSubmodule G) _ (m ⁻¹' B) (hB.preimage m.continuous)
+    (fun g ↦ ⟨fun h ↦ h.2, fun h ↦
+      ⟨modulatedExponentialDecay_mem_bruhatSmooth m Set.univ Set.univ_nonempty g, h⟩⟩) f
 
 /-- Paper: §4.5.2, p. 205. The fixed-support k-stage imposes k-invariance
 on the supported decay space, with the topology inherited from the decay space. -/
