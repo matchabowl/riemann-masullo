@@ -90,7 +90,8 @@ def heckeLogDiscriminantConductor (χ : U[F]) : ℝ :=
 discriminant contribution. -/
 theorem heckeLogDiscriminantConductor_one :
     heckeLogDiscriminantConductor (1 : U[F]) =
-      Real.log (Int.natAbs (NumberField.discr F)) := by sorry
+      Real.log (Int.natAbs (NumberField.discr F)) := by
+  simp [heckeLogDiscriminantConductor]
 
 /-- Paper: Equation (B.4.2.3), p. 614. The reflected logarithmic derivative
 and the discriminant–conductor term give the logarithmic derivative of the continuation.
