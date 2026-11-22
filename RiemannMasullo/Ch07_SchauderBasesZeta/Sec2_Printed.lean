@@ -1,5 +1,6 @@
 module
 
+public import Mathlib.Algebra.Field.ULift
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 /-! # §7.2 Claims that are false as printed -/
@@ -247,9 +248,63 @@ def sLocalCoordinate_closedEmbedding : Prop :=
     (∀ v : S, IsClosedEmbedding (fun x : (v.val.adicCompletion F)ˣ ↦
       (QuotientGroup.mk (prod.symm (1, fin.symm (Pi.mulSingle v x))) : Jₛ(F, S))))
 
+/-- Every universe contains a number field of degree one, namely a lift of ℚ. -/
+private theorem sLocalCoordinate_closedEmbedding_exists_numberField :
+    ∃ (F : Type u) (_ : Field F) (_ : NumberField F), Module.finrank ℚ F = 1 := by
+  let e : ULift.{u} ℚ ≃+* ℚ := ULift.ringEquiv
+  have : CharZero (ULift.{u} ℚ) := RingHom.charZero e.toRingHom
+  let l : ULift.{u} ℚ ≃ₗ[ℚ] ℚ := e.toRatAlgEquiv.toLinearEquiv
+  have : FiniteDimensional ℚ (ULift.{u} ℚ) := Module.Finite.equiv l.symm
+  exact ⟨ULift.{u} ℚ, inferInstance, {}, by rw [l.finrank_eq, Module.finrank_self]⟩
+
+/-- A number field of degree one has a single infinite place. -/
+private theorem sLocalCoordinate_closedEmbedding_subsingleton (F : Type*) [Field F]
+    [NumberField F] (h : Module.finrank ℚ F = 1) : Subsingleton (InfinitePlace F) := by
+  have h₁ := InfinitePlace.card_add_two_mul_card_eq_rank F
+  have h₂ := InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces (K := F)
+  exact Fintype.card_le_one_iff_subsingleton.mp (by omega)
+
+open Classical in
+/-- The refutation at a fixed universe: in a degree-one field the units −1 and 1 at the
+only infinite place have the same class, since −1 is a global unit. -/
+private theorem sLocalCoordinate_closedEmbedding_false_aux
+    (h : sLocalCoordinate_closedEmbedding.{u}) : False := by
+  obtain ⟨F, _, _, hF⟩ := sLocalCoordinate_closedEmbedding_exists_numberField.{u}
+  have key : ∀ (w : InfinitePlace F) (x : w.Completionˣ),
+      (((ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+        ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)).symm
+        (ContinuousMulEquiv.piUnits.symm (Pi.mulSingle w x), 1) : (SAdeleRing F ∅)ˣ) :
+          SAdeleRing F ∅).1 w = x := by
+    intro w x
+    change ((Pi.mulSingle w x : ∀ w, w.Completionˣ) w : w.Completion) = x
+    rw [Pi.mulSingle_eq_same]
+  have hsub := sLocalCoordinate_closedEmbedding_subsingleton F hF
+  obtain ⟨w⟩ : Nonempty (InfinitePlace F) := inferInstance
+  have hinj := ((h F ∅).1 w).injective
+  have hne : (-1 : w.Completionˣ) ≠ 1 := by
+    intro h1
+    have h2 := congrArg (fun x : w.Completionˣ ↦ InfinitePlace.Completion.extensionEmbedding w x.val) h1
+    norm_num at h2
+  apply hne
+  apply hinj
+  dsimp only
+  refine ((sIdeleQuotient_mk_eq_one F ∅ _).2 ⟨-1, ?_⟩).trans
+    ((sIdeleQuotient_mk_eq_one F ∅ _).2 ⟨1, ?_⟩).symm
+  all_goals
+    apply Units.ext
+    apply Prod.ext
+    · funext v
+      obtain rfl := Subsingleton.elim v w
+      refine Eq.trans ?_ ((sAdele_diagonal_apply F ∅ _).2.1 v).symm
+      rw [key]
+      simp
+    · funext v
+      exact absurd v.2 (Finset.notMem_empty _)
+
 /-- Paper: Preamble to (7.2.1.12), p. 336.
 For ℚ with only the real place, the two real units 1 and −1 give the same class. -/
-theorem sLocalCoordinate_closedEmbedding_false : ¬ sLocalCoordinate_closedEmbedding := by sorry
+theorem sLocalCoordinate_closedEmbedding_false : ¬ sLocalCoordinate_closedEmbedding :=
+  sLocalCoordinate_closedEmbedding_false_aux
 
 /-- Paper: Chart change before Theorem 7.2.1.4, p. 336.
 For two unitary base points of the same component, the new base is asserted to be
@@ -383,13 +438,80 @@ def sLocalPrincipalValue_tfae_exact_order : Prop :=
       (∃ g : ℬ𝔽(F), (K𝔽(F, ω)).mkQ (adelePrincipalValue F S₀ g) = π x)
     ]
 
+/-- The trivial unitary character is unramified outside every finite set of places. -/
+private theorem sLocalPrincipalValue_tfae_exact_order_one_mem {F : Type*} [Field F]
+    [NumberField F] (S : Finset Places(F)) :
+    globalUnitary(F, (1 : PontryaginDual C𝔽(F))) ∈ unramifiedOutside F S := by
+  rw [mem_unramifiedOutside_iff]
+  intro v _ u
+  rfl
+
+/-- The local chart of the trivial unitary character at exponent zero is the trivial
+quasi-character. -/
+private theorem sLocalPrincipalValue_tfae_exact_order_chart {F : Type*} [Field F]
+    [NumberField F] (S : Finset Places(F))
+    (hS : globalUnitary(F, (1 : PontryaginDual C𝔽(F))) ∈ unramifiedOutside F S) :
+    localChart(F, S, (1 : PontryaginDual C𝔽(F)), hS) 0 = 1 := by
+  ext g
+  induction g using QuotientGroup.induction_on with | H x => ?_
+  change sIdeleRestriction F S _ (QuotientGroup.mk x) * _ ^ (0 : ℂ) = 1
+  rw [Complex.cpow_zero, mul_one, sIdeleRestriction_mk]
+  rfl
+
+/-- The global Z-function of a test vanishing pointwise vanishes identically along the
+trivial chart, so its order at zero is ⊤. -/
+private theorem sLocalPrincipalValue_tfae_exact_order_zero {F : Type*} [Field F]
+    [NumberField F] (f : ℬ𝔽(F)) (hf : ∀ x, f x = 0) :
+    meromorphicOrderAt (fun s ↦ globalIdelicZFunction f
+      (ideleClassNormTwist (1 : PontryaginDual C𝔽(F)) s)) 0 = ⊤ := by
+  have hM := (globalIdelicZFunction_meromorphic f 1).meromorphicOn
+  refine hM.meromorphicOrderAt_eq_top_of_isPreconnected (x := 2) isPreconnected_univ
+    (mem_univ _) (mem_univ _) ?_
+  rw [meromorphicOrderAt_eq_top_iff]
+  have hopen : {s : ℂ | 1 < s.re} ∈ 𝓝 (2 : ℂ) :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  filter_upwards [nhdsWithin_le_nhds hopen] with s hs
+  have hmem : ideleClassNormTwist (1 : PontryaginDual C𝔽(F)) s ∈
+      (relativeRightHalfPlane (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+        (ideleClassNorm_ne_one (F := F)) 1 : Set (QuasiCharacter C𝔽(F))) := by
+    change 1 < quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) _
+    rw [quasiCharacterAbscissa_ideleClassNormTwist]
+    exact hs
+  rw [globalIdelicZFunction_eq_integral f hmem]
+  simp [globalIdelicZetaIntegral, hf]
+
+/-- The refutation at a fixed universe, with the zero test and the trivial character. -/
+private theorem sLocalPrincipalValue_tfae_exact_order_false_aux
+    (h : sLocalPrincipalValue_tfae_exact_order.{u}) : False := by
+  classical
+  obtain ⟨F, _, _, -⟩ := sLocalCoordinate_closedEmbedding_exists_numberField.{u}
+  obtain ⟨T, hT⟩ := eventually_trivial_sIdealClassGroup F
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 F)
+  let v₀ : Places(F) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  have h₀ : ({v₀} : Finset Places(F)) ⊆ insert v₀ T := by simp
+  have H := h F (insert v₀ T) {v₀} h₀ (Finset.singleton_nonempty v₀)
+    (hT _ (Finset.subset_insert _ _)) 1 (sLocalPrincipalValue_tfae_exact_order_one_mem _) 0
+  have hiff := H _ (List.mem_cons_self ..) _ (List.mem_cons_of_mem _ (List.mem_cons_self ..))
+  have h2 := hiff.mp (fun _ _ _ _ _ _ ↦ map_zero _) 0
+  have hpos : 0 < sLocalFinitePoleMultiplicity {v₀} (1 : Xₛ(F, insert v₀ T)) := by
+    rw [sLocalFinitePoleMultiplicity_one _ h₀]
+    exact Finset.card_pos.mpr (Finset.singleton_nonempty v₀)
+  have h3 := h2 (by
+    convert hpos using 2
+    exact sLocalPrincipalValue_tfae_exact_order_chart _ _)
+  have h4 := sLocalPrincipalValue_tfae_exact_order_zero
+    (sAdeleSchwartzToGlobal F (insert v₀ T) 0) (fun x ↦ by rw [map_zero]; rfl)
+  exact WithTop.top_ne_natCast _ (h4.symm.trans h3)
+
 /-- Paper: Proposition 7.2.2.1, p. 339.
 Take ℚ, the real place and p, select p, and take the trivial character and the
 zero test. Its local coefficients vanish and both principal-value preimages
 can be zero. Its global order at the trivial character is ⊤, whereas the
 printed condition requires order zero. -/
 theorem sLocalPrincipalValue_tfae_exact_order_false :
-    ¬ sLocalPrincipalValue_tfae_exact_order := by sorry
+    ¬ sLocalPrincipalValue_tfae_exact_order :=
+  sLocalPrincipalValue_tfae_exact_order_false_aux
 
 open Classical in
 /-- Paper: Corollary 7.2.2.2, p. 340.
@@ -419,13 +541,38 @@ def sLocalPolarPrincipalValue_tfae_exact_order : Prop :=
       (∃ g : adelePolarSubspace F, (K𝔽(F, ω)).mkQ (adelePrincipalValue F S₀ g.val) = π x)
     ]
 
+/-- The refutation at a fixed universe, with the zero polar test and the trivial
+character. -/
+private theorem sLocalPolarPrincipalValue_tfae_exact_order_false_aux
+    (h : sLocalPolarPrincipalValue_tfae_exact_order.{u}) : False := by
+  classical
+  obtain ⟨F, _, _, -⟩ := sLocalCoordinate_closedEmbedding_exists_numberField.{u}
+  obtain ⟨T, hT⟩ := eventually_trivial_sIdealClassGroup F
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 F)
+  let v₀ : Places(F) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  have h₀ : ({v₀} : Finset Places(F)) ⊆ insert v₀ T := by simp
+  have H := h F (insert v₀ T) {v₀} h₀ (Finset.singleton_nonempty v₀)
+    (hT _ (Finset.subset_insert _ _)) 1 (sLocalPrincipalValue_tfae_exact_order_one_mem _) 0
+  have hiff := H _ (List.mem_cons_self ..) _ (List.mem_cons_of_mem _ (List.mem_cons_self ..))
+  have h2 := hiff.mp (fun _ _ _ _ _ ↦ map_zero _) 0
+  have hpos : 0 < sLocalFinitePoleMultiplicity {v₀} (1 : Xₛ(F, insert v₀ T)) := by
+    rw [sLocalFinitePoleMultiplicity_one _ h₀]
+    exact Finset.card_pos.mpr (Finset.singleton_nonempty v₀)
+  have h3 := h2 (by
+    convert hpos using 2
+    exact sLocalPrincipalValue_tfae_exact_order_chart _ _)
+  have h4 := sLocalPrincipalValue_tfae_exact_order_zero
+    (sAdeleSchwartzToGlobal F (insert v₀ T) 0) (fun x ↦ by rw [map_zero]; rfl)
+  exact WithTop.top_ne_natCast _ (h4.symm.trans h3)
+
 /-- Paper: Corollary 7.2.2.2, p. 340.
 Take ℚ, the real place and p, select p, and take the trivial character and the
 zero test. Both evaluations vanish, all local coefficients vanish, and both
 principal-value preimages can be zero. The global order is ⊤ at the trivial
 character, while the asserted order is one. -/
 theorem sLocalPolarPrincipalValue_tfae_exact_order_false :
-    ¬ sLocalPolarPrincipalValue_tfae_exact_order := by sorry
+    ¬ sLocalPolarPrincipalValue_tfae_exact_order :=
+  sLocalPolarPrincipalValue_tfae_exact_order_false_aux
 
 end Printed
 end RiemannMasullo
