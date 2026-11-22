@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.UniformSpace.CompactConvergence
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-!
 # Topological spaces of adelic theta functions and idelic Z-functions
@@ -162,7 +163,151 @@ theorem globalIdelicZFunction_mem (f : ℬ𝔽) :
 /-- Paper: Definition 5.1.1.1(1), p. 223.
 The regular values of global Z-functions depend complex linearly on the test function. -/
 theorem globalIdelicZFunction_isLinear :
-    IsLinearMap ℂ (globalZValues : ℬ𝔽 → _) := by sorry
+    IsLinearMap ℂ (globalZValues : ℬ𝔽 → _) := by
+  classical
+  let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  have hpos (g : C𝔽) : 0 < ((ideleClassNorm F g : ℝ≥0) : ℝ) :=
+    NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hne (g : C𝔽) : (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (hpos g).ne'
+  -- Every quasi-character lies on a norm-twist chart of a unitary character.
+  have hdecomp (c : X𝔽) : ∃ (χ : PontryaginDual C𝔽) (s : ℂ), ideleClassNormTwist χ s = c := by
+    let s := quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) c
+    let d := c * ideleClassNormTwist (1 : PontryaginDual C𝔽) (-(s : ℂ))
+    have hd (g : C𝔽) : ‖d g‖ = 1 := by
+      change ‖c g * (1 * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ)))‖ = 1
+      rw [one_mul, norm_mul, norm_quasiCharacter_eq_rpow_abscissa _
+        (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)),
+        Complex.norm_cpow_eq_rpow_re_of_pos (hpos g), Complex.neg_re, Complex.ofReal_re]
+      change ((ideleClassNorm F g : ℝ≥0) : ℝ) ^ s * ((ideleClassNorm F g : ℝ≥0) : ℝ) ^ (-s) = 1
+      rw [← Real.rpow_add (hpos g), add_neg_cancel, Real.rpow_zero]
+    let χ : PontryaginDual C𝔽 :=
+      { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+        map_one' := Circle.ext (map_one d)
+        map_mul' := fun g h ↦ Circle.ext (map_mul d g h)
+        continuous_toFun := d.continuous.subtype_mk _ }
+    refine ⟨χ, s, ?_⟩
+    ext1 g
+    change (c g * (1 * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ)))) *
+      (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (s : ℂ) = c g
+    rw [one_mul, mul_assoc, ← Complex.cpow_add _ _ (hne g), neg_add_cancel, Complex.cpow_zero,
+      mul_one]
+  -- The norm-twist chart centred at a point of such a chart is a translate of it.
+  have hchart (χ : PontryaginDual C𝔽) (w z : ℂ) :
+      normChart𝔽 (ideleClassNormTwist χ w) z = ideleClassNormTwist χ (w + z) := by
+    ext1 g
+    change ((χ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ w) *
+      (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ z =
+        (χ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (w + z)
+    rw [Complex.cpow_add _ _ (hne g), mul_assoc]
+  have habs (χ : PontryaginDual C𝔽) (s : ℂ) :
+      quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+        (ideleClassNorm_ne_one (F := F)) (ideleClassNormTwist χ s) = s.re :=
+    quasiCharacterAbscissa_ideleClassNormTwist χ s
+  have habs₁ : quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) (1 : X𝔽) = 0 := by
+    have := quasiCharacterAbscissa_of_unitary_twist (ideleClassNorm F)
+      (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)) (1 : X𝔽)
+      (1 : PontryaginDual C𝔽) 0 (fun g ↦ by simp)
+    simpa using this
+  -- To the right of one every quasi-character is regular.
+  have hregular (χ : PontryaginDual C𝔽) (w : ℂ) (hw : 1 < w.re) :
+      0 ≤ globalIdelicOrderBound (ideleClassNormTwist χ w) := by
+    have h₁ : ideleClassNormTwist χ w ≠ 1 := fun h ↦ by
+      have := habs χ w
+      rw [h, habs₁] at this
+      linarith
+    have h₂ : ideleClassNormTwist χ w ≠ ideleClassNormTwist (1 : PontryaginDual C𝔽) 1 :=
+      fun h ↦ by
+        have := habs χ w
+        rw [h, habs] at this
+        simp only [Complex.one_re] at this
+        linarith
+    simp [globalIdelicOrderBound, h₁, h₂]
+  -- Linear relations between zeta integrals to the right of one persist at regular points.
+  have key (f₁ f₂ f₃ : ℬ𝔽) (a b : ℂ)
+      (hI : ∀ c : X𝔽, c ∈ (relativeRightHalfPlane (G := C𝔽) (ideleClassNorm F)
+        (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)) 1 : Set X𝔽) →
+        globalIdelicZetaIntegral f₃ c =
+          a * globalIdelicZetaIntegral f₁ c + b * globalIdelicZetaIntegral f₂ c)
+      (c : X𝔽) (hc : 0 ≤ globalIdelicOrderBound c) :
+      globalIdelicZFunction f₃ c =
+        a * globalIdelicZFunction f₁ c + b * globalIdelicZFunction f₂ c := by
+    obtain ⟨χ, s₀, rfl⟩ := hdecomp c
+    obtain ⟨Z₁, hZ₁, h₁⟩ := globalIdelicZFunction_mem f₁
+    obtain ⟨Z₂, hZ₂, h₂⟩ := globalIdelicZFunction_mem f₂
+    obtain ⟨Z₃, hZ₃, h₃⟩ := globalIdelicZFunction_mem f₃
+    have hM (Z : X𝔽 → ℂ)
+        (hZ : ∀ c : X𝔽, MeromorphicAt (fun z ↦ Z (normChart𝔽 c z)) 0) (w : ℂ) :
+        MeromorphicAt (fun w ↦ Z (ideleClassNormTwist χ w)) w := by
+      have h := hZ (ideleClassNormTwist χ w)
+      simp only [hchart] at h
+      have h' : MeromorphicAt ((fun w ↦ Z (ideleClassNormTwist χ w)) ∘ (· + w)) 0 := by
+        simpa only [Function.comp_def, add_comm] using h
+      simpa using meromorphicAt_comp_add_const_iff_meromorphicAt.mp h'
+    have hA (Z : X𝔽 → ℂ)
+        (hZ : AnalyticAt ℂ (fun z ↦ Z (normChart𝔽 (ideleClassNormTwist χ s₀) z)) 0) :
+        AnalyticAt ℂ (fun w ↦ Z (ideleClassNormTwist χ w)) s₀ := by
+      simp only [hchart] at hZ
+      have h := hZ.comp_of_eq
+        (analyticAt_id.sub analyticAt_const : AnalyticAt ℂ (fun w : ℂ ↦ w - s₀) s₀)
+        (sub_self s₀)
+      simpa only [Function.comp_def, Pi.sub_apply, id_eq, add_sub_cancel] using h
+    let D : ℂ → ℂ := fun w ↦ Z₃ (ideleClassNormTwist χ w) -
+      (a * Z₁ (ideleClassNormTwist χ w) + b * Z₂ (ideleClassNormTwist χ w))
+    have hDM : MeromorphicOn D Set.univ := fun w _ ↦
+      (hM Z₃ (fun c ↦ (h₃ c).1) w).sub
+        ((analyticAt_const.meromorphicAt.mul (hM Z₁ (fun c ↦ (h₁ c).1) w)).add
+          (analyticAt_const.meromorphicAt.mul (hM Z₂ (fun c ↦ (h₂ c).1) w)))
+    have hDA : AnalyticAt ℂ D s₀ :=
+      (hA Z₃ ((h₃ _).2.2 hc)).sub ((analyticAt_const.mul (hA Z₁ ((h₁ _).2.2 hc))).add
+        (analyticAt_const.mul (hA Z₂ ((h₂ _).2.2 hc))))
+    have hval (Z : X𝔽 → ℂ) (f : ℬ𝔽) (hZ : ∀ c : {c : X𝔽 // 0 ≤ globalIdelicOrderBound c},
+        Z c = globalZValues f c) (c : X𝔽) (hc : 0 ≤ globalIdelicOrderBound c) :
+        Z c = globalIdelicZFunction f c :=
+      hZ ⟨c, hc⟩
+    have hEq (w : ℂ) (hw : 1 < w.re) : D w = 0 := by
+      have hm : ideleClassNormTwist χ w ∈ (relativeRightHalfPlane (G := C𝔽) (ideleClassNorm F)
+          (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)) 1 : Set X𝔽) := by
+        change 1 < quasiCharacterAbscissa _ _ _ _
+        rwa [habs]
+      have hr := hregular χ w hw
+      simp only [D, hval Z₁ f₁ hZ₁ _ hr, hval Z₂ f₂ hZ₂ _ hr, hval Z₃ f₃ hZ₃ _ hr,
+        globalIdelicZFunction_eq_integral _ hm, hI _ hm, sub_self]
+    have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    have htop : meromorphicOrderAt D 2 = ⊤ :=
+      meromorphicOrderAt_eq_top_iff.mpr ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds)
+    have ho := hDM.meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+      (Set.mem_univ (2 : ℂ)) (Set.mem_univ s₀) htop
+    have hloc : D =ᶠ[𝓝[≠] s₀] fun _ ↦ 0 := meromorphicOrderAt_eq_top_iff.mp ho
+    have hD₀ : D s₀ = 0 :=
+      tendsto_nhds_unique (hDA.continuousAt.tendsto.mono_left nhdsWithin_le_nhds)
+        (tendsto_const_nhds.congr' hloc.symm)
+    rw [← hval Z₁ f₁ hZ₁ _ hc, ← hval Z₂ f₂ hZ₂ _ hc, ← hval Z₃ f₃ hZ₃ _ hc]
+    exact sub_eq_zero.mp hD₀
+  refine ⟨fun f g ↦ ?_, fun a f ↦ ?_⟩
+  · ext c
+    change globalIdelicZFunction (f + g) c.val =
+      globalIdelicZFunction f c.val + globalIdelicZFunction g c.val
+    have h := key f g (f + g) 1 1 (fun c hc ↦
+      ((integral_congr_ae (Filter.Eventually.of_forall fun x ↦
+        add_mul (f (Multiplicative.ofAdd x.val)) (g (Multiplicative.ofAdd x.val))
+          (c (QuotientGroup.mk x)))).trans
+        (integral_add (globalIdelicZetaIntegral_integrable f c hc)
+          (globalIdelicZetaIntegral_integrable g c hc))).trans
+        (congrArg₂ (· + ·) (one_mul _).symm (one_mul _).symm)) c.val c.property
+    exact h.trans (congrArg₂ (· + ·) (one_mul _) (one_mul _))
+  · ext c
+    change globalIdelicZFunction (a • f) c.val = a * globalIdelicZFunction f c.val
+    have h := key f f (a • f) a 0 (fun c hc ↦
+      ((integral_congr_ae (Filter.Eventually.of_forall fun x ↦
+        mul_assoc a (f (Multiplicative.ofAdd x.val)) (c (QuotientGroup.mk x)))).trans
+        (integral_const_mul a _)).trans
+        ((add_zero _).symm.trans (congrArg (_ + ·) (zero_mul _).symm))) c.val c.property
+    exact h.trans ((congrArg (_ + ·) (zero_mul _)).trans (add_zero _))
 
 /-- Paper: Definition 5.1.1.1(1), p. 223.
 The global idelic Mellin transform sends a test function to its continued Z-function.
@@ -214,7 +359,120 @@ theorem sLocalIdelicZFunction_mem (f : ℬₛ) :
 /-- Paper: Definition 5.1.1.1(2), p. 223.
 The regular values of S-local Z-functions depend complex linearly on the test function. -/
 theorem sLocalIdelicZFunction_isLinear :
-    IsLinearMap ℂ (sLocalZValues : ℬₛ → _) := by sorry
+    IsLinearMap ℂ (sLocalZValues : ℬₛ → _) := by
+  classical
+  let u : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  have : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  have hpos (g : Jₛ) : 0 < ((mₛ g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hne (g : Jₛ) : (((mₛ g : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (hpos g).ne'
+  have hm : ∃ x, mₛ x ≠ 1 := by
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+    exact ⟨σ t, (hσ t).trans_ne ht⟩
+  -- Every quasi-character lies on a norm-twist chart of a unitary character.
+  have hdecomp (c : Xₛ) : ∃ (χ : PontryaginDual Jₛ) (s : ℂ), normChartₛ (u.comp χ) s = c := by
+    let s := quasiCharacterAbscissa (G := Jₛ) mₛ (isProperMap_sIdeleQuotientNorm F S) hm c
+    let d := normChartₛ c (-(s : ℂ))
+    have hd (g : Jₛ) : ‖d g‖ = 1 := by
+      change ‖c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ))‖ = 1
+      rw [norm_mul, norm_quasiCharacter_eq_rpow_abscissa (G := Jₛ) mₛ
+        (isProperMap_sIdeleQuotientNorm F S) hm,
+        Complex.norm_cpow_eq_rpow_re_of_pos (hpos g), Complex.neg_re, Complex.ofReal_re]
+      change ((mₛ g : ℝ≥0) : ℝ) ^ s * ((mₛ g : ℝ≥0) : ℝ) ^ (-s) = 1
+      rw [← Real.rpow_add (hpos g), add_neg_cancel, Real.rpow_zero]
+    let χ : PontryaginDual Jₛ :=
+      { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+        map_one' := Circle.ext (map_one d)
+        map_mul' := fun g h ↦ Circle.ext (map_mul d g h)
+        continuous_toFun := d.continuous.subtype_mk _ }
+    refine ⟨χ, s, ?_⟩
+    ext1 g
+    change (c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ))) * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (s : ℂ) =
+      c g
+    rw [mul_assoc, ← Complex.cpow_add _ _ (hne g), neg_add_cancel, Complex.cpow_zero, mul_one]
+  -- The norm-twist chart centred at a point of a chart is a translate of it.
+  have hchart (c : Xₛ) (w z : ℂ) : normChartₛ (normChartₛ c w) z = normChartₛ c (w + z) := by
+    ext1 g
+    change (c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ w) * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ z =
+      c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (w + z)
+    rw [Complex.cpow_add _ _ (hne g), mul_assoc]
+  -- Linear relations between zeta integrals on the positive half-plane persist at regular points.
+  have key (f₁ f₂ f₃ : ℬₛ) (a b : ℂ)
+      (hI : ∀ (χ : PontryaginDual Jₛ) (s : ℂ), 0 < s.re →
+        sLocalIdelicZetaIntegral f₃ (normChartₛ (u.comp χ) s) =
+          a * sLocalIdelicZetaIntegral f₁ (normChartₛ (u.comp χ) s) +
+            b * sLocalIdelicZetaIntegral f₂ (normChartₛ (u.comp χ) s))
+      (c : Xₛ) (hc : 0 ≤ sLocalIdelicOrderBound c) :
+      sLocalIdelicZFunction f₃ c =
+        a * sLocalIdelicZFunction f₁ c + b * sLocalIdelicZFunction f₂ c := by
+    obtain ⟨χ, s₀, rfl⟩ := hdecomp c
+    have hρ : 0 ≤ min 0 (meromorphicOrderAt
+        (fun z ↦ sLocalRhoFactor (F := F) (S := S) (normChartₛ (u.comp χ) z)) s₀) := by
+      have h := hc
+      simp only [sLocalIdelicOrderBound, hchart] at h
+      have e : meromorphicOrderAt
+          (fun z ↦ sLocalRhoFactor (F := F) (S := S) (normChartₛ (u.comp χ) (s₀ + z))) 0 =
+          meromorphicOrderAt
+            (fun z ↦ sLocalRhoFactor (F := F) (S := S) (normChartₛ (u.comp χ) z)) s₀ := by
+        have := meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt (x := (0 : ℂ)) (c := s₀)
+          (f := fun z ↦ sLocalRhoFactor (F := F) (S := S) (normChartₛ (u.comp χ) z))
+        simpa only [Function.comp_def, add_comm, zero_add, add_zero] using this
+      rwa [e] at h
+    have hA (f : ℬₛ) :
+        AnalyticAt ℂ (fun w ↦ sLocalIdelicZFunction f (normChartₛ (u.comp χ) w)) s₀ :=
+      (sLocalIdelicZFunction_meromorphic f χ (Set.mem_univ s₀)
+        ).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+          (hρ.trans (sLocalIdelicZFunction_poles f χ s₀))
+    let D : ℂ → ℂ := fun w ↦ sLocalIdelicZFunction f₃ (normChartₛ (u.comp χ) w) -
+      (a * sLocalIdelicZFunction f₁ (normChartₛ (u.comp χ) w) +
+        b * sLocalIdelicZFunction f₂ (normChartₛ (u.comp χ) w))
+    have hM (f : ℬₛ) (w : ℂ) :
+        MeromorphicAt (fun w ↦ sLocalIdelicZFunction f (normChartₛ (u.comp χ) w)) w :=
+      (sLocalIdelicZFunction_meromorphic f χ (Set.mem_univ w)).meromorphicAt
+    have hDM : MeromorphicOn D Set.univ := fun w _ ↦
+      (hM f₃ w).sub ((analyticAt_const.meromorphicAt.mul (hM f₁ w)).add
+        (analyticAt_const.meromorphicAt.mul (hM f₂ w)))
+    have hDA : AnalyticAt ℂ D s₀ :=
+      (hA f₃).sub ((analyticAt_const.mul (hA f₁)).add (analyticAt_const.mul (hA f₂)))
+    have hEq (w : ℂ) (hw : 0 < w.re) : D w = 0 := by
+      have hp : normChartₛ (u.comp χ) w ∈ {c : Xₛ | ∃ (χ : PontryaginDual Jₛ) (s : ℂ),
+          s ∈ Complex.re ⁻¹' Set.Ioi (0 : ℝ) ∧ c = normChartₛ (u.comp χ) s} :=
+        ⟨χ, w, hw, rfl⟩
+      simp only [D, sLocalIdelicZFunction_eq_integral _ hp, hI χ w hw, sub_self]
+    have hnear : ∀ᶠ z in 𝓝 (1 : ℂ), 0 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    have htop : meromorphicOrderAt D 1 = ⊤ :=
+      meromorphicOrderAt_eq_top_iff.mpr ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds)
+    have ho := hDM.meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+      (Set.mem_univ (1 : ℂ)) (Set.mem_univ s₀) htop
+    have hloc : D =ᶠ[𝓝[≠] s₀] fun _ ↦ 0 := meromorphicOrderAt_eq_top_iff.mp ho
+    have hD₀ : D s₀ = 0 :=
+      tendsto_nhds_unique (hDA.continuousAt.tendsto.mono_left nhdsWithin_le_nhds)
+        (tendsto_const_nhds.congr' hloc.symm)
+    exact sub_eq_zero.mp hD₀
+  refine ⟨fun f g ↦ ?_, fun a f ↦ ?_⟩
+  · ext c
+    change sLocalIdelicZFunction (f + g) c.val =
+      sLocalIdelicZFunction f c.val + sLocalIdelicZFunction g c.val
+    have h := key f g (f + g) 1 1 (fun χ s hs ↦
+      ((integral_congr_ae (Filter.Eventually.of_forall fun x ↦
+        add_mul (f (Multiplicative.ofAdd x.val)) (g (Multiplicative.ofAdd x.val))
+          (normChartₛ (u.comp χ) s (QuotientGroup.mk x)))).trans
+        (integral_add (sLocalIdelicZetaIntegral_integrable f _ ⟨χ, s, hs, rfl⟩)
+          (sLocalIdelicZetaIntegral_integrable g _ ⟨χ, s, hs, rfl⟩))).trans
+        (congrArg₂ (· + ·) (one_mul _).symm (one_mul _).symm)) c.val c.property
+    exact h.trans (congrArg₂ (· + ·) (one_mul _) (one_mul _))
+  · ext c
+    change sLocalIdelicZFunction (a • f) c.val = a * sLocalIdelicZFunction f c.val
+    have h := key f f (a • f) a 0 (fun χ s _ ↦
+      ((integral_congr_ae (Filter.Eventually.of_forall fun x ↦
+        mul_assoc a (f (Multiplicative.ofAdd x.val))
+          (normChartₛ (u.comp χ) s (QuotientGroup.mk x)))).trans
+        (integral_const_mul a _)).trans
+        ((add_zero _).symm.trans (congrArg (_ + ·) (zero_mul _).symm))) c.val c.property
+    exact h.trans ((congrArg (_ + ·) (zero_mul _)).trans (add_zero _))
 
 /-- Paper: Definition 5.1.1.1(2), p. 223.
 The S-local idelic Mellin transform sends a test function to its continued Z-function.
@@ -385,12 +643,14 @@ theorem sLocalThetaToZ_isQuotientMap :
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is locally convex. -/
 theorem globalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (GlobalAdelicThetaSpace F) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬ𝔽 := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The S-local theta quotient is locally convex. -/
 theorem sLocalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬₛ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is Hausdorff if the global theta kernel is closed. -/
@@ -529,6 +789,40 @@ theorem sLocalAdelicTheta_ker_isClosed : IsClosed (LinearMap.ker thetaₛ : Set 
   exact (congrArg (IsClosed (X := ℬₛ)) hker).mp
     (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
+/-- On a barrelled space, the integral over a compact space against a finite measure of
+a family of continuous linear functionals is continuous if each test vector gives a
+continuous function of the parameter. The pointwise supremum of the absolute values of
+the functionals is then a continuous seminorm, and the integral is bounded by the
+total mass times this seminorm. -/
+private theorem continuous_integral_of_continuous_eval {E H : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousConstSMul ℂ E]
+    [BarrelledSpace ℂ E] [TopologicalSpace H] [CompactSpace H] {m : MeasurableSpace H}
+    (μ : Measure H) [IsFiniteMeasure μ]
+    (Φ : E → H → ℂ) (hlin : ∀ h, IsLinearMap ℂ fun f ↦ Φ f h)
+    (hE : ∀ h, Continuous fun f ↦ Φ f h) (hH : ∀ f, Continuous (Φ f))
+    (hint : ∀ f, Integrable (Φ f) μ) : Continuous fun f ↦ ∫ h, Φ f h ∂μ := by
+  let p (h : H) : Seminorm ℂ E := (normSeminorm ℂ ℂ).comp (IsLinearMap.mk' _ (hlin h))
+  have hp (h : H) : Continuous (p h) := continuous_norm.comp (hE h)
+  have hpt (f : E) : BddAbove (Set.range fun h ↦ p h f) :=
+    (isCompact_range (hH f).norm).bddAbove
+  have hbdd : BddAbove (Set.range p) := Seminorm.bddAbove_range_iff.mpr hpt
+  have hsup : Continuous (⨆ h, p h : Seminorm ℂ E) :=
+    (congrArg Continuous (Seminorm.coe_iSup_eq hbdd)).mpr (Seminorm.continuous_iSup p hp hbdd)
+  let I : E →ₗ[ℂ] ℂ := IsLinearMap.mk' (fun f ↦ ∫ h, Φ f h ∂μ)
+    ⟨fun f f' ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_add f f')).trans
+        (integral_add (hint f) (hint f')),
+      fun c f ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_smul c f)).trans
+        (integral_smul c _)⟩
+  have hq : Continuous ((μ Set.univ).toNNReal • ⨆ h, p h : Seminorm ℂ E) :=
+    hsup.const_smul _
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp I fun _ ↦
+    Seminorm.continuous_of_le hq fun f ↦ ?_
+  have hle (h : H) : ‖Φ f h‖ ≤ (⨆ h, p h) f := by
+    rw [Seminorm.coe_iSup_eq hbdd, iSup_apply]
+    exact le_ciSup (hpt f) h
+  exact (norm_integral_le_of_norm_le_const (.of_forall hle)).trans_eq
+    (mul_comm _ ((μ Set.univ).toNNReal : ℝ))
+
 local notation "homogeneousTheta𝔽" =>
   fun ω : PontryaginDual (MonoidHom.ker m𝔽) ↦
     IsLinearMap.mk' (homogeneousAdelicTheta (F := F) ω)
@@ -537,7 +831,36 @@ local notation "homogeneousTheta𝔽" =>
 /-- Paper: Theorem 5.1.1.3(2), p. 224.
 The kernel of global homogeneous theta at each norm-one character is closed. -/
 theorem homogeneousAdelicTheta_ker_isClosed (ω : PontryaginDual (MonoidHom.ker m𝔽)) :
-    IsClosed (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by sorry
+    IsClosed (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by
+  let : BarrelledSpace ℂ ℬ𝔽 := (adeleSchwartz_montel (F := F)).2.1
+  let : MeasurableSpace C𝔽 := borel _
+  let : CompactSpace (MonoidHom.ker m𝔽) := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hθ := adelicTheta_isLinear (F := F)
+  have hlin (c : C𝔽) : IsLinearMap ℂ fun f : ℬ𝔽 ↦ adelicTheta f c :=
+    ⟨fun f f' ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_add f f'),
+      fun a f ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_smul a f)⟩
+  have hcont (g : C𝔽) : Continuous (fun f : ℬ𝔽 ↦ homogeneousAdelicTheta ω f g) :=
+    continuous_integral_of_continuous_eval (normOneIdeleClassTamagawaMeasure F)
+      (fun f h ↦ adelicTheta f (h.val * g) * (ω h : ℂ))
+      (fun h ↦ ⟨fun f f' ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_add f f')).trans
+          (add_mul _ _ _),
+        fun a f ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_smul a f)).trans
+          (smul_mul_assoc _ _ _)⟩)
+      (fun h ↦ (adelicTheta_eval_continuous (h.val * g)).mul continuous_const)
+      (fun f ↦ ((adelicTheta f).continuous.comp
+        (continuous_subtype_val.mul continuous_const)).mul
+          (continuous_subtype_val.comp ω.continuous))
+      (fun f ↦ homogeneousAdelicTheta_integrable ω f g)
+  have hker : (⋂ g : C𝔽, (fun f : ℬ𝔽 ↦ homogeneousAdelicTheta ω f g) ⁻¹' {0}) =
+      (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h, fun h g ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬ𝔽)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
 /-- Paper: Theorem 5.1.1.3(3), p. 224.
 The norm-one S-idele quotient carries the Borel measurable structure used in §3.3. -/
@@ -554,7 +877,41 @@ local notation "homogeneousThetaₛ" =>
 /-- Paper: Theorem 5.1.1.3(3), p. 224.
 The kernel of S-local homogeneous theta at each norm-one character is closed. -/
 theorem sLocalHomogeneousAdelicTheta_ker_isClosed (ω : PontryaginDual (MonoidHom.ker mₛ)) :
-    IsClosed (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by sorry
+    IsClosed (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by
+  let : BarrelledSpace ℂ ℬₛ := (sAdeleSchwartz_montel (F := F) S).1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ :=
+    Units.val_injective.countable
+  have : CompactSpace (MonoidHom.ker mₛ) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hθ (c : Jₛ) : IsLinearMap ℂ (fun f : ℬₛ ↦ sLocalAdelicThetaOnClasses F S f c) ∧
+      Continuous (fun f : ℬₛ ↦ sLocalAdelicThetaOnClasses F S f c) := by
+    induction c using QuotientGroup.induction_on with | H x => ?_
+    simp only [sLocalAdelicThetaOnClasses_mk]
+    exact ⟨⟨fun f f' ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ x) (map_add thetaₛ f f'),
+        fun a f ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ x) (map_smul thetaₛ a f)⟩,
+      schwartzBruhat_continuous_of_hasSum _ _ fun f ↦
+        (sLocalAdelicTheta_hasSumUniformlyOn F S f {x} isCompact_singleton).hasSum rfl⟩
+  have hcont (g : Jₛ) : Continuous (fun f : ℬₛ ↦ homogeneousThetaₛ ω f g) :=
+    continuous_integral_of_continuous_eval (sLocalNormOneQuotientMeasure F S)
+      (fun f h ↦ sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ))
+      (fun h ↦ ⟨fun f f' ↦ (congrArg (· * (ω h : ℂ)) ((hθ _).1.map_add f f')).trans
+          (add_mul _ _ _),
+        fun a f ↦ (congrArg (· * (ω h : ℂ)) ((hθ _).1.map_smul a f)).trans
+          (smul_mul_assoc _ _ _)⟩)
+      (fun h ↦ (hθ _).2.mul continuous_const)
+      (fun f ↦ ((sLocalAdelicThetaOnClasses F S f).continuous.comp
+        (continuous_const.mul continuous_subtype_val)).mul
+          (continuous_subtype_val.comp ω.continuous))
+      (fun f ↦ sLocalHomogeneousAdelicTheta_integrable F S _ ω f g)
+  have hker : (⋂ g : Jₛ, (fun f : ℬₛ ↦ homogeneousThetaₛ ω f g) ⁻¹' {0}) =
+      (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h, fun h g ↦ congrArg (fun φ : C(Jₛ, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬₛ)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
 /-- Paper: Lemma 5.1.2.1(1), p. 224.
 The kernels of the global zeta and global theta transforms agree. -/
